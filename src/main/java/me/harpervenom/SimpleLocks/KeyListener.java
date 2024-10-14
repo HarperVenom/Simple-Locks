@@ -6,7 +6,9 @@ import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.*;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.type.Door;
 import org.bukkit.block.data.type.TrapDoor;
 import org.bukkit.entity.HumanEntity;
@@ -28,7 +30,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static me.harpervenom.SimpleLocks.ChunksListener.chunkNotLoaded;
-import static me.harpervenom.SimpleLocks.LockListener.getMainBlock;
+import static me.harpervenom.SimpleLocks.LockListener.*;
 import static me.harpervenom.SimpleLocks.classes.Key.getKey;
 import static me.harpervenom.SimpleLocks.classes.Lock.getLock;
 
@@ -157,6 +159,23 @@ public class KeyListener implements Listener {
                     if (door.isOpen()) {
                         e.setCancelled(true);
                     }
+
+                    long startTime = System.nanoTime();
+
+                    if (isCurrentlyPoweredAdjacent(b) || isCurrentlyPoweredAdjacent(b.getRelative(BlockFace.UP))) {
+                        p.swingMainHand();
+                        BlockState bs = b.getState();
+                        door.setPowered(true);
+                        door.setOpen(true);
+                        bs.setBlockData(door);
+                        bs.update();
+                        if (b.getType().name().contains("IRON")) p.getWorld().playSound(b.getLocation(), Sound.BLOCK_IRON_DOOR_OPEN,1,1);
+                    }
+
+                    long endTime = System.nanoTime(); // or System.currentTimeMillis();
+                    long duration = endTime - startTime;
+
+                            Bukkit.broadcastMessage(duration + "");
                 }
 
                 lock.setLocked(false, p);
@@ -167,16 +186,26 @@ public class KeyListener implements Listener {
             } else {
                 if (b.getBlockData() instanceof Door door) {
                     lock.setLocked(true, p);
-                    if (!door.isOpen()) {
-                        e.setCancelled(true);
+
+                    e.setCancelled(true);
+                    if (door.isOpen()) {
+                        BlockState bs = b.getState();
+                        door.setPowered(false);
+                        door.setOpen(false);
+                        bs.setBlockData(door);
+                        bs.update();
+                        if (b.getType().name().contains("IRON")) p.getWorld().playSound(b.getLocation(), Sound.BLOCK_IRON_DOOR_CLOSE,1,1);
                     }
+
                 }
-                if (b.getBlockData() instanceof TrapDoor door) {
-                    lock.setLocked(true, p);
-                    if (!door.isOpen()) {
-                        e.setCancelled(true);
-                    }
-                }
+//                if (b.getBlockData() instanceof TrapDoor door) {
+//                    lock.setLocked(true, p);
+//
+//                    BlockState bs = b.getState();
+//                    door.setPowered(false);
+//                    b.setBlockData(door);
+//                    bs.update();
+//                }
             }
         } else {
             Key key = getKey(p.getInventory().getItemInMainHand());

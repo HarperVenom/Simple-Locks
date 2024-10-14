@@ -12,10 +12,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.block.Action;
-import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.block.BlockExplodeEvent;
-import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.block.*;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityInteractEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
@@ -25,6 +22,7 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.material.Redstone;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -295,6 +293,83 @@ public class LockListener implements Listener {
             if (lock != null && lock.isLocked()) {
                 e.setCancelled(true);
             }
+        }
+    }
+
+//    public static List<Block> poweredBlocks = new ArrayList<>();
+
+    @EventHandler
+    public void RedstoneEvent(BlockRedstoneEvent e) {
+//        Bukkit.broadcastMessage(poweredBlocks.size() + "");
+
+        Block b = getMainBlock(e.getBlock());
+        Lock lock = getLock(b);
+        if (lock == null) return;
+        if (lock.isLocked()) {
+//            if (e.getNewCurrent() > 0) {
+//                if (!poweredBlocks.contains(b)) poweredBlocks.add(b);
+//            } else {
+//                poweredBlocks.remove(b);
+//            }
+            e.setNewCurrent(0);
+        }
+    }
+
+    public static boolean isCurrentlyPoweredAdjacent(Block block) {
+        // Directions to check for adjacent blocks
+        Block[] adjacentBlocks = new Block[]{
+                block.getRelative(BlockFace.NORTH),
+                block.getRelative(BlockFace.SOUTH),
+                block.getRelative(BlockFace.EAST),
+                block.getRelative(BlockFace.WEST),
+                block.getRelative(BlockFace.UP),
+                block.getRelative(BlockFace.DOWN)
+        };
+
+        // Check each adjacent block for active power
+        for (Block adjacentBlock : adjacentBlocks) {
+            // If the adjacent block is currently powering the door, return true
+            if (isBlockCurrentlyPowering(adjacentBlock)) {
+                return true; // Found a block currently transmitting power
+            }
+
+            // Check if there are levers on adjacent blocks
+            for (BlockFace face : BlockFace.values()) {
+                Block attachedBlock = adjacentBlock.getRelative(face);
+                if (attachedBlock.getType() == Material.LEVER && attachedBlock.getBlockData().getAsString().contains("powered=true")) {
+                    return true; // Lever is powered
+                }
+            }
+        }
+
+        return false; // No adjacent blocks actively transmitting power
+    }
+
+    private static boolean isBlockCurrentlyPowering(Block block) {
+        // Check if the block is a redstone block (always powers adjacent blocks)
+        if (block.getType() == Material.REDSTONE_BLOCK) {
+            return true; // Redstone block actively powers adjacent blocks
+        }
+
+        // Check if the block is a button (any type)
+        if (block.getType().toString().contains("BUTTON")) {
+            return block.getBlockData().getAsString().contains("powered=true"); // Check if button is powered
+        }
+
+        // Check for powered components that can affect the door
+        switch (block.getType()) {
+            case LEVER:
+                return block.getBlockData().getAsString().contains("powered=true"); // Check if lever is powered
+            case DAYLIGHT_DETECTOR:
+                return block.getBlockData().getAsString().contains("power=") &&
+                        Integer.parseInt(block.getBlockData().getAsString().split("=")[1]) > 0;
+            case REDSTONE_TORCH:
+                return true; // Always powers adjacent blocks when active
+            case REDSTONE_WIRE:
+                return block.getBlockData().getAsString().contains("power=") &&
+                        Integer.parseInt(block.getBlockData().getAsString().split("=")[1]) > 0; // Must have power
+            default:
+                return false; // Not a power-transmitting block
         }
     }
 
