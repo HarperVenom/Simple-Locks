@@ -1,4 +1,4 @@
-package me.harpervenom.simple_locks;
+package me.harpervenom.SimpleLocks;
 
 import org.bukkit.Material;
 import org.bukkit.block.Block;

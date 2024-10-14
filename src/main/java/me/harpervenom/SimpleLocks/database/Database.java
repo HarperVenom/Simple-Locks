@@ -1,7 +1,7 @@
-package me.harpervenom.simple_locks.database;
+package me.harpervenom.SimpleLocks.database;
 
-import me.harpervenom.simple_locks.SimpleLocks;
-import me.harpervenom.simple_locks.classes.Lock;
+import me.harpervenom.SimpleLocks.SimpleLocks;
+import me.harpervenom.SimpleLocks.classes.Lock;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
@@ -26,6 +26,7 @@ public class Database {
             try (Statement statement = connection.createStatement()) {
                 String sql = "CREATE TABLE IF NOT EXISTS locks (" +
                         "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        "key_id INTEGER, " +
                         "owner_id TEXT NOT NULL, " +
                         "x INTEGER NOT NULL, " +
                         "y INTEGER NOT NULL, " +
@@ -43,34 +44,68 @@ public class Database {
     }
 
     public CompletableFuture<Integer> createLock(String ownerId, int x, int y, int z, String world) {
-        Player p = Bukkit.getPlayer(ownerId);
+        return createLock(ownerId, x, y, z, world, false, false);
+    }
+
+    public CompletableFuture<Integer> createLock(String ownerId, int x, int y, int z, String world, boolean isConnected, boolean isLocked) {
         return CompletableFuture.supplyAsync(() -> {
-            String regionSql = "INSERT INTO locks (owner_id, x, y, z, world, connected, locked) VALUES " +
-                    "(?, ?, ?, ?, ?, ?, ?)";
+            String insertSql = "INSERT INTO locks (owner_id, x, y, z, world, connected, locked) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            String updateSql = "UPDATE locks SET key_id = ? WHERE id = ?";
 
-            try (PreparedStatement psRegion = connection.prepareStatement(regionSql, Statement.RETURN_GENERATED_KEYS)) {
-                psRegion.setString(1, ownerId);
-                psRegion.setInt(2, x);
-                psRegion.setInt(3, y);
-                psRegion.setInt(4, z);
-                psRegion.setString(5, world);
-                psRegion.setBoolean(6, false);
-                psRegion.setBoolean(7, false);
+            try (PreparedStatement psInsert = connection.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
+                // Insert the lock without the key_id first
+                psInsert.setString(1, ownerId);
+                psInsert.setInt(2, x);
+                psInsert.setInt(3, y);
+                psInsert.setInt(4, z);
+                psInsert.setString(5, world);
+                psInsert.setBoolean(6, isConnected);  // isConnected
+                psInsert.setBoolean(7, isLocked);  // isLocked
 
-                int affectedRows = psRegion.executeUpdate();
+                int affectedRows = psInsert.executeUpdate();
 
                 if (affectedRows > 0) {
-                    try (ResultSet rs = psRegion.getGeneratedKeys()) {
+                    try (ResultSet rs = psInsert.getGeneratedKeys()) {
                         if (rs.next()) {
-                            return rs.getInt(1);
+                            int generatedId = rs.getInt(1);  // Get the generated id
+
+                            // Now update the key_id with the generated id
+                            try (PreparedStatement psUpdate = connection.prepareStatement(updateSql)) {
+                                psUpdate.setInt(1, generatedId);  // Set key_id as the generated id
+                                psUpdate.setInt(2, generatedId);  // Update the row where id = generated id
+
+                                psUpdate.executeUpdate();
+                            }
+
+                            return generatedId;  // Return the generated id
                         }
                     }
                 }
 
-                return null;
+                return null;  // If no rows were affected or no keys were generated
             } catch (SQLException e) {
                 e.printStackTrace();
                 return null;
+            }
+        });
+    }
+
+    public CompletableFuture<Boolean> updateLock(int id, Integer keyId, boolean isConnected, boolean isLocked) {
+        return CompletableFuture.supplyAsync(() -> {
+            String sql = "UPDATE locks SET key_id = ?, connected = ?, locked = ? WHERE id = ? ";
+
+            try (PreparedStatement psRegion = connection.prepareStatement(sql)) {
+                psRegion.setObject(1, keyId);
+                psRegion.setBoolean(2, isConnected);
+                psRegion.setBoolean(3, isLocked);
+                psRegion.setInt(4, id);
+
+                psRegion.executeUpdate();
+
+                return true;
+            } catch (SQLException e) {
+                e.printStackTrace();
+                return false;
             }
         });
     }
@@ -103,7 +138,7 @@ public class Database {
 
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
-                        Lock block = new Lock(rs.getInt("id"), rs.getString("owner_id"), rs.getInt("x"),
+                        Lock block = new Lock(rs.getInt("id"), rs.getInt("key_id"), rs.getString("owner_id"), rs.getInt("x"),
                                 rs.getInt("y"), rs.getInt("z"), rs.getString("world"),
                                 rs.getBoolean("connected"), rs.getBoolean("locked"));
 

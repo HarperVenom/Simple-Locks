@@ -1,6 +1,6 @@
-package me.harpervenom.simple_locks;
+package me.harpervenom.SimpleLocks;
 
-import me.harpervenom.simple_locks.classes.Lock;
+import me.harpervenom.SimpleLocks.classes.Lock;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.*;
@@ -27,10 +27,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
-import static me.harpervenom.simple_locks.ChunksListener.chunkNotLoaded;
-import static me.harpervenom.simple_locks.Materials.*;
+import static me.harpervenom.SimpleLocks.ChunksListener.chunkNotLoaded;
+import static me.harpervenom.SimpleLocks.Materials.*;
+import static me.harpervenom.SimpleLocks.classes.Lock.getLock;
+import static me.harpervenom.SimpleLocks.classes.Lock.getNeighbour;
 
-public class LockBlocksListener implements Listener {
+public class LockListener implements Listener {
 
     public static HashMap<Chunk, List<Lock>> locks = new HashMap<>();
 
@@ -47,7 +49,22 @@ public class LockBlocksListener implements Listener {
             return;
         }
 
-        new Lock(p, b);
+        Bukkit.getScheduler().runTaskLater(SimpleLocks.getPlugin(), () -> {
+            Lock nextLock = getNeighbour(b.getLocation());
+            if (nextLock != null && !nextLock.getOwnerId().equals(p.getUniqueId().toString())) {
+                e.setCancelled(true);
+                p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "You can't place the block next to someone else's"));
+            }
+
+            Lock lock = new Lock(p, b);
+
+            if (nextLock != null && nextLock.isConnected()) {
+                lock.setConnected(true);
+                lock.setLocked(nextLock.isLocked());
+                lock.setKeyId(nextLock.getKeyId());
+                p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GREEN + "Block has been connected to the next one."));
+            }
+        }, 1);
     }
 
     @EventHandler
@@ -79,6 +96,33 @@ public class LockBlocksListener implements Listener {
                 lock.remove();
             }
         }
+    }
+
+    @EventHandler
+    public void BreakBlockUnderDoor(BlockBreakEvent e) {
+        Block door = e.getBlock().getLocation().clone().add(0, 1, 0).getBlock();
+        Player p = e.getPlayer();
+
+        if (door.getType().toString().endsWith("_DOOR")){
+            e.setCancelled(true);
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "You can't break blocks under doors."));
+        }
+    }
+
+    @EventHandler
+    public void StickUseEvent(PlayerInteractEvent e) {
+        Player p = e.getPlayer();
+        Block b = e.getClickedBlock();
+        if (b == null) return;
+
+        if (e.getAction() == Action.RIGHT_CLICK_AIR || e.getAction() == Action.RIGHT_CLICK_BLOCK
+                || e.getAction() == Action.LEFT_CLICK_AIR) return;
+
+        if (e.getHand() == EquipmentSlot.OFF_HAND) return;
+        if (!p.isSneaking()) return;
+        e.setCancelled(true);
+
+        showInfo(b, p);
     }
 
     public static HashMap<Block, Integer> damagedBlocks = new HashMap<>();
@@ -160,22 +204,6 @@ public class LockBlocksListener implements Listener {
         restoreHealthTasks.put(b, unloadTask);
     }
 
-    @EventHandler
-    public void StickUseEvent(PlayerInteractEvent e) {
-        Player p = e.getPlayer();
-        Block b = e.getClickedBlock();
-        if (b == null) return;
-
-        if (e.getAction() == Action.RIGHT_CLICK_AIR || e.getAction() == Action.RIGHT_CLICK_BLOCK
-                || e.getAction() == Action.LEFT_CLICK_AIR) return;
-
-        if (e.getHand() == EquipmentSlot.OFF_HAND) return;
-        if (!p.isSneaking()) return;
-        e.setCancelled(true);
-
-        showInfo(b, p);
-    }
-
     public void showInfo(Block b, Player p) {
         b = getMainBlock(b);
         Chunk chunk = b.getChunk();
@@ -196,17 +224,8 @@ public class LockBlocksListener implements Listener {
         }
         p.sendMessage(ChatColor.YELLOW + "ID: " + lock.getId());
         p.sendMessage(ChatColor.YELLOW + "Owner: " + Bukkit.getOfflinePlayer(UUID.fromString(lock.getOwnerId())).getName());
+        p.sendMessage(ChatColor.YELLOW + "Connected: " + lock.isConnected());
         p.sendMessage(ChatColor.YELLOW + "Health: " + health + "/" + maxBlockHealth);
-    }
-
-    public static Lock getLock(Block b) {
-        Chunk chunk = b.getChunk();
-
-        for (Lock block : locks.get(chunk)) {
-            if (block.getLoc().equals(b.getLocation())) return block;
-        }
-
-        return null;
     }
 
     public static Block getMainBlock(Block b) {

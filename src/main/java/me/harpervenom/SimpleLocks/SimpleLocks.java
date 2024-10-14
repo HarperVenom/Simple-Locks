@@ -1,7 +1,7 @@
-package me.harpervenom.simple_locks;
+package me.harpervenom.SimpleLocks;
 
-import me.harpervenom.simple_locks.classes.Lock;
-import me.harpervenom.simple_locks.database.Database;
+import me.harpervenom.SimpleLocks.classes.Lock;
+import me.harpervenom.SimpleLocks.database.Database;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SimpleLocks extends JavaPlugin {
@@ -22,7 +22,7 @@ public final class SimpleLocks extends JavaPlugin {
 
         Lock.db = db;
 
-        getServer().getPluginManager().registerEvents(new LockBlocksListener(), this);
+        getServer().getPluginManager().registerEvents(new LockListener(), this);
         getServer().getPluginManager().registerEvents(new ChunksListener(db), this);
         getServer().getPluginManager().registerEvents(new KeyListener(), this);
 

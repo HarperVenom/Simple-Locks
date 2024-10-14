@@ -1,17 +1,18 @@
-package me.harpervenom.simple_locks.classes;
+package me.harpervenom.SimpleLocks.classes;
 
-import me.harpervenom.simple_locks.SimpleLocks;
-import org.bukkit.ChatColor;
-import org.bukkit.Material;
-import org.bukkit.NamespacedKey;
+import me.harpervenom.SimpleLocks.SimpleLocks;
+import org.bukkit.*;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
+
+import static me.harpervenom.SimpleLocks.classes.Lock.getNeighbour;
 
 public class Key{
 
@@ -59,7 +60,8 @@ public class Key{
 
     public static Key getKey(ItemStack item) {
         ItemMeta meta = item.getItemMeta();
-        if (!meta.getPersistentDataContainer().has(new NamespacedKey(SimpleLocks.getPlugin(),"key"), PersistentDataType.BOOLEAN)) return null;
+        if (meta == null || !meta.getPersistentDataContainer()
+                .has(new NamespacedKey(SimpleLocks.getPlugin(),"key"), PersistentDataType.BOOLEAN)) return null;
 
         return new Key(item);
     }
@@ -68,11 +70,19 @@ public class Key{
         return keyItem;
     }
 
-    public void connectToBlock(Lock lock) {
-        int lockId = lock.getId();
+    public void connectToLock(Lock lock) {
+
+        Integer lockId = lock.getKeyId();
         lock.setConnected(true);
 
+        addVisualKey();
         addConnection(lockId);
+
+        Lock nextLock = getNeighbour(lock.getLoc());
+        if (nextLock == null) return;
+
+        nextLock.setKeyId(lockId);
+        nextLock.setConnected(true);
     }
 
     public void addConnection(int id) {
@@ -86,11 +96,19 @@ public class Key{
             int size = getAmountOfConnections(); // We infer the current size
             container.set(new NamespacedKey(SimpleLocks.getPlugin(), INTEGER_KEY_PREFIX + size), PersistentDataType.INTEGER, id);
 
+            keyItem.setItemMeta(meta);
+        }
+    }
+
+    public void addVisualKey() {
+        ItemMeta meta = keyItem.getItemMeta();
+        if (meta != null) {
             List<String> lore = meta.getLore();
             if (getAmountOfConnections() == 0 || lore == null) {
                 lore = new ArrayList<>();
             }
             lore.add(ChatColor.GRAY + generateName());
+            meta.setLore(lore);
 
             keyItem.setItemMeta(meta);
         }
@@ -114,6 +132,8 @@ public class Key{
         }
         return 0;
     }
+
+
 
     public String generateName(){
         String CHARACTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";

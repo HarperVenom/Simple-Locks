@@ -1,6 +1,6 @@
-package me.harpervenom.simple_locks;
+package me.harpervenom.SimpleLocks;
 
-import me.harpervenom.simple_locks.database.Database;
+import me.harpervenom.SimpleLocks.database.Database;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
@@ -18,7 +18,7 @@ import org.bukkit.scheduler.BukkitTask;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static me.harpervenom.simple_locks.LockBlocksListener.locks;
+import static me.harpervenom.SimpleLocks.LockListener.locks;
 
 public class ChunksListener implements Listener {
 
