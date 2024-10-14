@@ -32,6 +32,7 @@ public class Database {
                         "y INTEGER NOT NULL, " +
                         "z INTEGER NOT NULL, " +
                         "world TEXT NOT NULL, " +
+                        "type TEXT NOT NULL, " +
                         "connected BOOLEAN NOT NULL, " +
                         "locked BOOLEAN NOT NULL, " +
                         "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)";
@@ -43,13 +44,13 @@ public class Database {
         }
     }
 
-    public CompletableFuture<Integer> createLock(String ownerId, int x, int y, int z, String world) {
-        return createLock(ownerId, x, y, z, world, false, false);
+    public CompletableFuture<Integer> createLock(String ownerId, int x, int y, int z, String world, String type) {
+        return createLock(ownerId, x, y, z, world, type, false, false);
     }
 
-    public CompletableFuture<Integer> createLock(String ownerId, int x, int y, int z, String world, boolean isConnected, boolean isLocked) {
+    public CompletableFuture<Integer> createLock(String ownerId, int x, int y, int z, String world, String type, boolean isConnected, boolean isLocked) {
         return CompletableFuture.supplyAsync(() -> {
-            String insertSql = "INSERT INTO locks (owner_id, x, y, z, world, connected, locked) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            String insertSql = "INSERT INTO locks (owner_id, x, y, z, world, type, connected, locked) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             String updateSql = "UPDATE locks SET key_id = ? WHERE id = ?";
 
             try (PreparedStatement psInsert = connection.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
@@ -59,8 +60,9 @@ public class Database {
                 psInsert.setInt(3, y);
                 psInsert.setInt(4, z);
                 psInsert.setString(5, world);
-                psInsert.setBoolean(6, isConnected);  // isConnected
-                psInsert.setBoolean(7, isLocked);  // isLocked
+                psInsert.setString(6, type);
+                psInsert.setBoolean(7, isConnected);  // isConnected
+                psInsert.setBoolean(8, isLocked);  // isLocked
 
                 int affectedRows = psInsert.executeUpdate();
 
@@ -139,7 +141,7 @@ public class Database {
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         Lock block = new Lock(rs.getInt("id"), rs.getInt("key_id"), rs.getString("owner_id"), rs.getInt("x"),
-                                rs.getInt("y"), rs.getInt("z"), rs.getString("world"),
+                                rs.getInt("y"), rs.getInt("z"), rs.getString("world"), rs.getString("type"),
                                 rs.getBoolean("connected"), rs.getBoolean("locked"));
 
                         blocks.add(block);

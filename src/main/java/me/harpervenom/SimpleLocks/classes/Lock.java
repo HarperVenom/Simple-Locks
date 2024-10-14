@@ -2,11 +2,15 @@ package me.harpervenom.SimpleLocks.classes;
 
 import me.harpervenom.SimpleLocks.SimpleLocks;
 import me.harpervenom.SimpleLocks.database.Database;
+import net.md_5.bungee.api.ChatMessageType;
+import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.*;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
 import org.bukkit.block.Chest;
 import org.bukkit.block.DoubleChest;
 import org.bukkit.block.data.type.Door;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
@@ -26,6 +30,7 @@ public class Lock {
     private Integer keyId = null;
     private final String ownerId;
     private final Location loc;
+    private final String type;
     private boolean isConnected;
     private boolean isLocked;
 
@@ -33,10 +38,11 @@ public class Lock {
     private static final long DEBOUNCE_DELAY = 100L; // 100 ticks (~5 seconds)
 
     public Lock(OfflinePlayer p, Block b) {
-        this.ownerId = p.getUniqueId().toString();
-        this.loc = b.getLocation();
-        this.isConnected = false;
-        this.isLocked = true;
+        ownerId = p.getUniqueId().toString();
+        loc = b.getLocation();
+        type = b.getType().name().contains("CHEST") || b.getType() == Material.BARREL ? "storage" : "door";
+        isConnected = false;
+        isLocked = false;
 
         Location loc = b.getLocation();
         Chunk chunk = b.getChunk();
@@ -51,11 +57,12 @@ public class Lock {
         createInDB();
     }
 
-    public Lock(int id, Integer keyId, String ownerId, int x, int y, int z, String world, boolean connected, boolean locked) {
+    public Lock(int id, Integer keyId, String ownerId, int x, int y, int z, String world, String type, boolean connected, boolean locked) {
         this.id = id;
         this.keyId = keyId;
         this.ownerId = ownerId;
         this.loc = new Location(Bukkit.getWorld(world), x, y, z);
+        this.type = type;
         this.isConnected = connected;
         this.isLocked = locked;
     }
@@ -88,6 +95,21 @@ public class Lock {
     public boolean isLocked() {
         return isLocked;
     }
+    public void setLocked(boolean isLocked, Player p) {
+        setLocked(isLocked);
+        if (isLocked) {
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GRAY + "Locked."));
+        } else {
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GRAY + "Unlocked."));
+        }
+        p.getWorld().playSound(loc, Sound.BLOCK_IRON_TRAPDOOR_CLOSE,0.3f,2);
+
+        if (type.equals("storage")) {
+            Lock neighbour = getNeighbour(loc);
+            if (neighbour == null) return;
+            neighbour.setLocked(isLocked);
+        }
+    }
     public void setLocked(boolean isLocked) {
         this.isLocked = isLocked;
         updateInDB();
@@ -111,6 +133,7 @@ public class Lock {
                     loc.getBlockY(),
                     loc.getBlockZ(),
                     loc.getWorld().getName(),
+                    type,
                     isConnected,
                     isLocked
             ).thenAccept((result) -> {
@@ -181,6 +204,14 @@ public class Lock {
                 if (!door.getFacing().equals((nextDoor.getFacing()))) continue;
                 if (door.getHinge() == nextDoor.getHinge()) continue;
 
+                BlockFace direction = getDirection(X, Z);
+
+                if (direction == BlockFace.EAST || direction == BlockFace.WEST) {
+                    if (door.getFacing() != BlockFace.NORTH && door.getFacing() != BlockFace.SOUTH) continue;
+                } else {
+                    if (door.getFacing() != BlockFace.EAST && door.getFacing() != BlockFace.WEST) continue;
+                }
+
                 return nextLock;
             }
         }
@@ -188,9 +219,20 @@ public class Lock {
         return null;
     }
 
+    public static BlockFace getDirection(double x, double z) {
+
+        if (Math.abs(x) > Math.abs(z)) { // Check if X is greater (E/W direction)
+            return x > 0 ? BlockFace.EAST : BlockFace.WEST; // Positive X = EAST, Negative X = WEST
+        } else if (Math.abs(z) > Math.abs(x)) { // Check if Z is greater (N/S direction)
+            return z > 0 ? BlockFace.SOUTH : BlockFace.NORTH; // Positive Z = SOUTH, Negative Z = NORTH
+        } else {
+            return BlockFace.SELF; // If both X and Z are zero or equal, return SELF
+        }
+    }
+
     public static Lock getLock(Block b) {
         Chunk chunk = b.getChunk();
-
+        if (!locks.containsKey(chunk)) return null;
         for (Lock block : locks.get(chunk)) {
             if (block.getLoc().equals(b.getLocation())) return block;
         }

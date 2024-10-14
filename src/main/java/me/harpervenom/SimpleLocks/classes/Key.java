@@ -71,8 +71,8 @@ public class Key{
     }
 
     public void connectToLock(Lock lock) {
-
         Integer lockId = lock.getKeyId();
+        if (lockId == null) return;
         lock.setConnected(true);
 
         addVisualKey();

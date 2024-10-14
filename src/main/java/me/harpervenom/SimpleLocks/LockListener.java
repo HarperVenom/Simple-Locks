@@ -10,11 +10,15 @@ import org.bukkit.block.data.Bisected;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.type.Door;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Villager;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntityInteractEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -23,6 +27,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
@@ -86,7 +91,7 @@ public class LockListener implements Listener {
             return;
         }
 
-        if (!lock.getOwnerId().equals(p.getUniqueId().toString()) || p.getGameMode() == GameMode.CREATIVE) {
+        if (lock.getOwnerId().equals(p.getUniqueId().toString()) || p.getGameMode() == GameMode.CREATIVE) {
             lock.remove();
         } else {
             boolean destroyed = hitBlock(p, b);
@@ -100,13 +105,39 @@ public class LockListener implements Listener {
 
     @EventHandler
     public void BreakBlockUnderDoor(BlockBreakEvent e) {
-        Block door = e.getBlock().getLocation().clone().add(0, 1, 0).getBlock();
+        Block b =  e.getBlock();
         Player p = e.getPlayer();
 
-        if (door.getType().toString().endsWith("_DOOR")){
+        if (isUnderDoorBlock(b)){
             e.setCancelled(true);
             p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "You can't break blocks under doors."));
         }
+    }
+
+    @EventHandler
+    public void VillagerOpenDoorEvent(EntityInteractEvent e){
+        if (!(e.getEntity() instanceof Villager)) return;
+        Block b = e.getBlock();
+        if (!(b.getBlockData() instanceof Door)) return;
+        Lock door = getLock(b);
+        if (door == null) return;
+        if (!door.isLocked()) return;
+        e.setCancelled(true);
+    }
+
+    @EventHandler
+    public void onExplosion(EntityExplodeEvent e) {
+        List<Block> blocksToRemove = new ArrayList<>();
+
+        for (Block block : e.blockList()) {
+            Block mainBlock = getMainBlock(block);
+            Lock lock = getLock(mainBlock);
+            if (lock != null || isUnderDoorBlock(block)) {
+                blocksToRemove.add(block);
+            }
+        }
+
+        e.blockList().removeAll(blocksToRemove);
     }
 
     @EventHandler
@@ -120,9 +151,16 @@ public class LockListener implements Listener {
 
         if (e.getHand() == EquipmentSlot.OFF_HAND) return;
         if (!p.isSneaking()) return;
+        if (!getLockBlocks().contains(b.getType())) return;
         e.setCancelled(true);
 
         showInfo(b, p);
+    }
+
+    public boolean isUnderDoorBlock(Block b) {
+        Block door = b.getLocation().clone().add(0, 1, 0).getBlock();
+
+        return !b.getType().toString().endsWith("_DOOR") && door.getType().toString().endsWith("_DOOR");
     }
 
     public static HashMap<Block, Integer> damagedBlocks = new HashMap<>();
@@ -222,9 +260,11 @@ public class LockListener implements Listener {
         if (damagedBlocks.containsKey(b)) {
             health = damagedBlocks.get(b);
         }
+        p.sendMessage(ChatColor.YELLOW + "-----------------");
         p.sendMessage(ChatColor.YELLOW + "ID: " + lock.getId());
         p.sendMessage(ChatColor.YELLOW + "Owner: " + Bukkit.getOfflinePlayer(UUID.fromString(lock.getOwnerId())).getName());
         p.sendMessage(ChatColor.YELLOW + "Connected: " + lock.isConnected());
+        p.sendMessage(ChatColor.YELLOW + "Locked: " + lock.isLocked());
         p.sendMessage(ChatColor.YELLOW + "Health: " + health + "/" + maxBlockHealth);
     }
 

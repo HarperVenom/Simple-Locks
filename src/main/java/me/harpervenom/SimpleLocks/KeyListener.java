@@ -6,15 +6,26 @@ import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.*;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
+import org.bukkit.block.data.type.Door;
+import org.bukkit.block.data.type.TrapDoor;
+import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.ShapelessRecipe;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.UUID;
 
 import static me.harpervenom.SimpleLocks.ChunksListener.chunkNotLoaded;
 import static me.harpervenom.SimpleLocks.LockListener.getMainBlock;
@@ -75,8 +86,6 @@ public class KeyListener implements Listener {
             return;
         }
 
-        p.sendMessage(key.getAmountOfConnections() + "");
-
         if (key.getAmountOfConnections() > 5 - 1) {
             p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "The key has reached its connection limit."));
             return;
@@ -110,7 +119,87 @@ public class KeyListener implements Listener {
         } else {
             key.connectToLock(lock);
         }
+        lock.setLocked(true, p);
         p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GREEN + "Key has been connected."));
+    }
+
+    @EventHandler
+    public void KeyUse(PlayerInteractEvent e) {
+        Player p = e.getPlayer();
+        if (e.getAction() != Action.RIGHT_CLICK_BLOCK) return;
+        if (e.getHand() != EquipmentSlot.HAND) return;
+
+        Block b = e.getClickedBlock();
+        if (b == null) return;
+        b = getMainBlock(b);
+        Lock lock = getLock(b);
+        if (lock == null || !lock.isConnected()) return;
+
+        Chunk chunk = b.getChunk();
+        if (chunkNotLoaded(p, chunk)) return;
+
+        boolean hasKey = hasKeyFor(lock, p);
+
+        if (!p.isSneaking()) {
+            if (lock.isLocked()) {
+                if (!hasKey) {
+                    e.setCancelled(true);
+                    p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "You don't have a key."));
+                    return;
+                }
+
+                if (b.getBlockData() instanceof Door door) {
+                    if (door.isOpen()) {
+                        e.setCancelled(true);
+                    }
+                }
+
+                lock.setLocked(false, p);
+
+                if (b.getType().name().contains("CHEST") || b.getType() == Material.BARREL) {
+                    quickOpen.put(p.getUniqueId(), lock);
+                }
+            } else {
+                if (b.getBlockData() instanceof Door door) {
+                    lock.setLocked(true, p);
+                    if (!door.isOpen()) {
+                        e.setCancelled(true);
+                    }
+                }
+                if (b.getBlockData() instanceof TrapDoor door) {
+                    lock.setLocked(true, p);
+                    if (!door.isOpen()) {
+                        e.setCancelled(true);
+                    }
+                }
+            }
+        } else {
+            Key key = getKey(p.getInventory().getItemInMainHand());
+            if (key != null) return;
+
+            e.setCancelled(true);
+            lock.setLocked(!lock.isLocked(), p);
+        }
+    }
+
+    HashMap<UUID, Lock> quickOpen = new HashMap<>();
+
+    @EventHandler
+    public void onInventoryClose(InventoryCloseEvent e) {
+        if (e.getPlayer() instanceof Player p) {
+
+            if (quickOpen.containsKey(p.getUniqueId())) {
+                Lock lock = quickOpen.get(p.getUniqueId());
+                quickOpen.get(p.getUniqueId()).setLocked(true, p);
+                quickOpen.remove(p.getUniqueId());
+
+                List<HumanEntity> viewers = new ArrayList<>(e.getViewers());
+                for (HumanEntity viewer : viewers) {
+                    Player player = (Player) viewer;
+                    player.closeInventory();
+                }
+            }
+        }
     }
 
     @EventHandler
@@ -120,6 +209,19 @@ public class KeyListener implements Listener {
         if (key != null) {
             e.setCancelled(true);
         }
+    }
+
+    public boolean hasKeyFor(Lock lock, Player p) {
+        Inventory inv = p.getInventory();
+        for (int i = 0; i < 41; i++) {
+            ItemStack item = inv.getItem(i);
+            if (item == null) continue;
+            Key key = getKey(item);
+            if (key == null) continue;
+            if (!key.hasConnection(lock.getKeyId())) continue;
+            return true;
+        }
+        return false;
     }
 
 }
