@@ -131,6 +131,11 @@ public class KeyListener implements Listener {
 
         Block b = e.getClickedBlock();
         if (b == null) return;
+
+        if (p.isSneaking() && e.isBlockInHand()) {
+            return;
+        }
+
         b = getMainBlock(b);
         Lock lock = getLock(b);
         if (lock == null || !lock.isConnected()) return;
@@ -140,14 +145,14 @@ public class KeyListener implements Listener {
 
         boolean hasKey = hasKeyFor(lock, p);
 
+        if (!hasKey) {
+            e.setCancelled(true);
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "You don't have a key."));
+            return;
+        }
+
         if (!p.isSneaking()) {
             if (lock.isLocked()) {
-                if (!hasKey) {
-                    e.setCancelled(true);
-                    p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "You don't have a key."));
-                    return;
-                }
-
                 if (b.getBlockData() instanceof Door door) {
                     if (door.isOpen()) {
                         e.setCancelled(true);

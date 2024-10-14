@@ -4,8 +4,7 @@ import me.harpervenom.SimpleLocks.classes.Lock;
 import net.md_5.bungee.api.ChatMessageType;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.*;
-import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
+import org.bukkit.block.*;
 import org.bukkit.block.data.Bisected;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.type.Door;
@@ -19,8 +18,10 @@ import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityInteractEvent;
+import org.bukkit.event.inventory.InventoryMoveItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -279,4 +280,22 @@ public class LockListener implements Listener {
 
         return b;
     }
+
+    @EventHandler
+    public void onInventoryMoveItem(InventoryMoveItemEvent e) {
+        InventoryHolder source = e.getSource().getHolder();
+        InventoryHolder destination = e.getDestination().getHolder();
+
+        if ((source instanceof Chest || source instanceof Barrel || destination instanceof Chest || destination instanceof Barrel) &&
+                (source instanceof Hopper || destination instanceof Hopper)) {
+
+            Block b = (source instanceof Hopper) ? e.getDestination().getLocation().getBlock() : e.getSource().getLocation().getBlock();
+            Lock lock = getLock(b);
+
+            if (lock != null && lock.isLocked()) {
+                e.setCancelled(true);
+            }
+        }
+    }
+
 }
