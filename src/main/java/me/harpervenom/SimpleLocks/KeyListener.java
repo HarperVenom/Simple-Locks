@@ -18,11 +18,9 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.inventory.EquipmentSlot;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.ShapelessRecipe;
+import org.bukkit.inventory.*;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -36,29 +34,63 @@ import static me.harpervenom.SimpleLocks.classes.Lock.getLock;
 
 public class KeyListener implements Listener {
 
+    NamespacedKey duplicateRecipe;
+
     public KeyListener(){
         Key blankKey = new Key();
 
         NamespacedKey NKEmptyKey = new NamespacedKey(SimpleLocks.getPlugin(), "emptyKey");
         ShapelessRecipe emptyKeyRecipe = new ShapelessRecipe(NKEmptyKey, blankKey.getItem());
         emptyKeyRecipe.addIngredient(Material.TRIPWIRE_HOOK);
-        emptyKeyRecipe.addIngredient(Material.IRON_INGOT);
-
-        NamespacedKey NSClearedKey = new NamespacedKey(SimpleLocks.getPlugin(), "clearedKey");
-        ShapelessRecipe clearedKey = new ShapelessRecipe(NSClearedKey, blankKey.getItem());
-        clearedKey.addIngredient(Material.TRIPWIRE_HOOK);
-        clearedKey.addIngredient(Material.IRON_NUGGET);
+        emptyKeyRecipe.addIngredient(Material.IRON_NUGGET);
 
         blankKey.getItem().setAmount(2);
 
-        NamespacedKey NSDuplicateKeys = new NamespacedKey(SimpleLocks.getPlugin(), "duplicateKeys");
-        ShapelessRecipe duplicateKeys = new ShapelessRecipe(NSDuplicateKeys, blankKey.getItem());
+        duplicateRecipe = new NamespacedKey(SimpleLocks.getPlugin(), "duplicateKeys");
+        ShapelessRecipe duplicateKeys = new ShapelessRecipe(duplicateRecipe, blankKey.getItem());
         duplicateKeys.addIngredient(Material.TRIPWIRE_HOOK);
         duplicateKeys.addIngredient(Material.TRIPWIRE_HOOK);
 
         Bukkit.addRecipe(emptyKeyRecipe);
-        Bukkit.addRecipe(clearedKey);
         Bukkit.addRecipe(duplicateKeys);
+    }
+
+    @EventHandler
+    public void DuplicateCraft(PrepareItemCraftEvent e){
+        Recipe recipe = e.getRecipe();
+
+        if (recipe instanceof ShapelessRecipe shapelessRecipe) {
+            NamespacedKey recipeKey = shapelessRecipe.getKey();
+
+            if (recipeKey.equals(duplicateRecipe)) {
+                ItemStack[] ingredients = e.getInventory().getMatrix();
+                int c = 0;
+                ItemStack result = null;
+
+                for (ItemStack ingredient : ingredients) {
+                    if (ingredient == null) continue;
+                    if (ingredient.getType().equals(Material.IRON_NUGGET)) return;
+                    if (ingredient.getType().equals(Material.TRIPWIRE_HOOK)) {
+                        Key key = getKey(ingredient);
+                        if (key == null) {
+                            e.getInventory().setResult(null);
+                            return;
+                        }
+                        if (key.getAmountOfConnections() > 0) {
+                            result = new ItemStack(ingredient);
+                            result.setAmount(2);
+                            c++;
+                        }
+                    }
+                }
+
+                if (c == 2) {
+                    result = null;
+                }
+
+                e.getInventory().setResult(result);
+            }
+        }
     }
 
     @EventHandler
@@ -160,8 +192,6 @@ public class KeyListener implements Listener {
                         e.setCancelled(true);
                     }
 
-                    long startTime = System.nanoTime();
-
                     if (isCurrentlyPoweredAdjacent(b) || isCurrentlyPoweredAdjacent(b.getRelative(BlockFace.UP))) {
                         p.swingMainHand();
                         BlockState bs = b.getState();
@@ -171,11 +201,6 @@ public class KeyListener implements Listener {
                         bs.update();
                         if (b.getType().name().contains("IRON")) p.getWorld().playSound(b.getLocation(), Sound.BLOCK_IRON_DOOR_OPEN,1,1);
                     }
-
-                    long endTime = System.nanoTime(); // or System.currentTimeMillis();
-                    long duration = endTime - startTime;
-
-                            Bukkit.broadcastMessage(duration + "");
                 }
 
                 lock.setLocked(false, p);
@@ -198,14 +223,20 @@ public class KeyListener implements Listener {
                     }
 
                 }
-//                if (b.getBlockData() instanceof TrapDoor door) {
-//                    lock.setLocked(true, p);
-//
-//                    BlockState bs = b.getState();
-//                    door.setPowered(false);
-//                    b.setBlockData(door);
-//                    bs.update();
-//                }
+                if (b.getBlockData() instanceof TrapDoor door) {
+                    lock.setLocked(true, p);
+
+                    e.setCancelled(true);
+                    if (door.isOpen()) {
+                        BlockState bs = b.getState();
+                        door.setPowered(false);
+                        door.setOpen(false);
+                        bs.setBlockData(door);
+                        bs.update();
+                        if (b.getType().name().contains("IRON")) p.getWorld().playSound(b.getLocation(), Sound.BLOCK_IRON_DOOR_CLOSE,1,1);
+                    }
+
+                }
             }
         } else {
             Key key = getKey(p.getInventory().getItemInMainHand());

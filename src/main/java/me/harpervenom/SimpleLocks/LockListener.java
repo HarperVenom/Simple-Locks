@@ -296,21 +296,12 @@ public class LockListener implements Listener {
         }
     }
 
-//    public static List<Block> poweredBlocks = new ArrayList<>();
-
     @EventHandler
     public void RedstoneEvent(BlockRedstoneEvent e) {
-//        Bukkit.broadcastMessage(poweredBlocks.size() + "");
-
         Block b = getMainBlock(e.getBlock());
         Lock lock = getLock(b);
         if (lock == null) return;
         if (lock.isLocked()) {
-//            if (e.getNewCurrent() > 0) {
-//                if (!poweredBlocks.contains(b)) poweredBlocks.add(b);
-//            } else {
-//                poweredBlocks.remove(b);
-//            }
             e.setNewCurrent(0);
         }
     }
@@ -357,20 +348,15 @@ public class LockListener implements Listener {
         }
 
         // Check for powered components that can affect the door
-        switch (block.getType()) {
-            case LEVER:
-                return block.getBlockData().getAsString().contains("powered=true"); // Check if lever is powered
-            case DAYLIGHT_DETECTOR:
-                return block.getBlockData().getAsString().contains("power=") &&
-                        Integer.parseInt(block.getBlockData().getAsString().split("=")[1]) > 0;
-            case REDSTONE_TORCH:
-                return true; // Always powers adjacent blocks when active
-            case REDSTONE_WIRE:
-                return block.getBlockData().getAsString().contains("power=") &&
-                        Integer.parseInt(block.getBlockData().getAsString().split("=")[1]) > 0; // Must have power
-            default:
-                return false; // Not a power-transmitting block
-        }
+        return switch (block.getType()) {
+            case LEVER -> block.getBlockData().getAsString().contains("powered=true"); // Check if lever is powered
+            case DAYLIGHT_DETECTOR -> block.getBlockData().getAsString().contains("power=") &&
+                    Integer.parseInt(block.getBlockData().getAsString().split("=")[1]) > 0;
+            case REDSTONE_TORCH -> true; // Always powers adjacent blocks when active
+            case REDSTONE_WIRE -> block.getBlockData().getAsString().contains("power=") &&
+                    Integer.parseInt(block.getBlockData().getAsString().split("=")[1]) > 0; // Must have power
+            default -> false; // Not a power-transmitting block
+        };
     }
 
 }
