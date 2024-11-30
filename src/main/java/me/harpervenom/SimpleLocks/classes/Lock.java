@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static me.harpervenom.SimpleLocks.LockListener.locks;
+import static me.harpervenom.SimpleLocks.Materials.getLockBlocks;
 import static me.harpervenom.SimpleLocks.SimpleLocks.getMessage;
 
 public class Lock {
@@ -237,6 +238,9 @@ public class Lock {
 
     public static Lock getLock(Block b) {
         Chunk chunk = b.getChunk();
+
+        if (!getLockBlocks().contains(b.getType())) return null;
+
         if (!locks.containsKey(chunk)) return null;
         for (Lock block : locks.get(chunk)) {
             if (block.getLoc().equals(b.getLocation())) return block;

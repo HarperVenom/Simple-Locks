@@ -2,10 +2,18 @@
 # from existing language file to the new one, replacing all the values in "" with translations
 language: "en_US"
 
-# Custom model data for keys:
+# Custom model data for keys (If changed later, you might have to use old keys to trigger the update):
 custom_model_data: 1
 
 # Maximum health values for different kinds of locks:
+
+# Blocks that can be locked (if you set any to false, it will only disable the locks, not remove them.
+# So if you change back to true, old keys will still work):
+lockable:
+  chest: true
+  barrel: true
+  door: true
+  trapdoor: true
 
 # Doors and Trapdoors
 iron_door_health: 10
