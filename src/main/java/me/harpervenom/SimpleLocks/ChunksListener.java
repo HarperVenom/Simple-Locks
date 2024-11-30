@@ -19,6 +19,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static me.harpervenom.SimpleLocks.LockListener.locks;
+import static me.harpervenom.SimpleLocks.SimpleLocks.getMessage;
 
 public class ChunksListener implements Listener {
 
@@ -153,7 +154,7 @@ public class ChunksListener implements Listener {
     public static boolean chunkNotLoaded(Player p, Chunk chunk) {
         if (!(locks.containsKey(chunk))) {
             if (p != null) {
-                p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "Chunk is not loaded."));
+                p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + getMessage("messages.chunk_not_loaded")));
             }
             loadWildChunks(getActiveChunks(chunk));
             return true;

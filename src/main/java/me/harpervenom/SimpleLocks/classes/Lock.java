@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static me.harpervenom.SimpleLocks.LockListener.locks;
+import static me.harpervenom.SimpleLocks.SimpleLocks.getMessage;
 
 public class Lock {
 
@@ -40,7 +41,7 @@ public class Lock {
     public Lock(OfflinePlayer p, Block b) {
         ownerId = p.getUniqueId().toString();
         loc = b.getLocation();
-        type = b.getType().name().contains("CHEST") || b.getType() == Material.BARREL ? "storage" : "door";
+        type = b.getType().name().contains("CHEST") || b.getType() == Material.BARREL ? "container" : "door";
         isConnected = false;
         isLocked = false;
 
@@ -98,13 +99,13 @@ public class Lock {
     public void setLocked(boolean isLocked, Player p) {
         setLocked(isLocked);
         if (isLocked) {
-            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GRAY + "Locked."));
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GRAY + getMessage("messages.locked")));
         } else {
-            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GRAY + "Unlocked."));
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GRAY + getMessage("messages.unlocked")));
         }
         p.getWorld().playSound(loc, Sound.BLOCK_IRON_TRAPDOOR_CLOSE,0.3f,2);
 
-        if (type.equals("storage")) {
+        if (type.equals("container")) {
             Lock neighbour = getNeighbour(loc);
             if (neighbour == null) return;
             neighbour.setLocked(isLocked);
@@ -124,6 +125,10 @@ public class Lock {
 
     public Location getLoc() {
         return loc;
+    }
+
+    public String getType() {
+        return type;
     }
 
     private void createInDB() {
@@ -237,6 +242,17 @@ public class Lock {
             if (block.getLoc().equals(b.getLocation())) return block;
         }
 
+        return null;
+    }
+
+    public static Lock getLock(int lockId) {
+        for (List<Lock> lockList : locks.values()) {
+            for (Lock lock : lockList) {
+                if (lock.getId() == lockId) {
+                    return lock;
+                }
+            }
+        }
         return null;
     }
 

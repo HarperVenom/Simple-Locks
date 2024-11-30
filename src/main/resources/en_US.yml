@@ -1,0 +1,30 @@
+names:
+  key: "Key"
+  blank: "blank"
+
+messages:
+  plugin_started: "Plugin has started."
+
+  chunk_not_loaded: "Chunk is not loaded."
+
+  locked: "Locked."
+  unlocked: "Unlocked."
+
+  not_your_key: "The key doesn't belong to you."
+  not_your_block: "The block doesn't belong to you."
+  key_limit: "The key has reached its connection limit."
+  already_connected: "Already connected."
+  key_connected: "Key has been connected."
+  no_key: "You don't have a key."
+
+  block_next_to_another: "You can't place the block next to someone else's."
+  block_connected: "Block has been connected to the next one."
+  cant_break_under_doors: "You can't break blocks under doors."
+
+info:
+  no_owner: "No owner."
+  owner: "Owner"
+  connected: "Connected"
+  locked: "Locked"
+  health: "Health"
+

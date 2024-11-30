@@ -8,6 +8,7 @@ import org.bukkit.*;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
+import org.bukkit.block.Container;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.type.Door;
 import org.bukkit.block.data.type.TrapDoor;
@@ -17,10 +18,15 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.PrepareAnvilEvent;
 import org.bukkit.event.inventory.PrepareItemCraftEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.*;
+import org.bukkit.inventory.meta.BundleMeta;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.view.AnvilView;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,6 +35,7 @@ import java.util.UUID;
 
 import static me.harpervenom.SimpleLocks.ChunksListener.chunkNotLoaded;
 import static me.harpervenom.SimpleLocks.LockListener.*;
+import static me.harpervenom.SimpleLocks.SimpleLocks.getMessage;
 import static me.harpervenom.SimpleLocks.classes.Key.getKey;
 import static me.harpervenom.SimpleLocks.classes.Lock.getLock;
 
@@ -50,6 +57,7 @@ public class KeyListener implements Listener {
         ShapelessRecipe duplicateKeys = new ShapelessRecipe(duplicateRecipe, blankKey.getItem());
         duplicateKeys.addIngredient(Material.TRIPWIRE_HOOK);
         duplicateKeys.addIngredient(Material.TRIPWIRE_HOOK);
+        duplicateKeys.addIngredient(Material.IRON_NUGGET);
 
         Bukkit.addRecipe(emptyKeyRecipe);
         Bukkit.addRecipe(duplicateKeys);
@@ -69,7 +77,6 @@ public class KeyListener implements Listener {
 
                 for (ItemStack ingredient : ingredients) {
                     if (ingredient == null) continue;
-                    if (ingredient.getType().equals(Material.IRON_NUGGET)) return;
                     if (ingredient.getType().equals(Material.TRIPWIRE_HOOK)) {
                         Key key = getKey(ingredient);
                         if (key == null) {
@@ -90,6 +97,36 @@ public class KeyListener implements Listener {
 
                 e.getInventory().setResult(result);
             }
+        }
+    }
+
+    @EventHandler
+    public void onAnvilRename(PrepareAnvilEvent e) {
+        ItemStack resultItem = e.getResult();
+        if (resultItem == null) return;
+        Key key = getKey(resultItem);
+        if (key == null) return;
+
+        ItemMeta meta = resultItem.getItemMeta();
+        if (meta == null) return;
+
+        String newName = meta.getDisplayName();
+
+        meta.setDisplayName(ChatColor.GOLD + "" + ChatColor.ITALIC + newName);
+        resultItem.setItemMeta(meta);
+    }
+
+    @EventHandler
+    public void DuplicateCraftEvent(CraftItemEvent e) {
+        Player p = (Player) e.getViewers().get(0);
+        ItemStack result = e.getCurrentItem();
+        if (result == null) return;
+        Key key = getKey(result);
+        if (key == null) return;
+
+        if (key.getOwnerID() != null && !key.getOwnerID().equals(p.getUniqueId().toString())) {
+            e.setCancelled(true);
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + getMessage("messages.not_your_key")));
         }
     }
 
@@ -115,18 +152,23 @@ public class KeyListener implements Listener {
 
         e.setCancelled(true);
 
-        if (!lock.getOwnerId().equals(p.getUniqueId().toString())) {
-            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "Not your block."));
+        if (key.getOwnerID() != null && !key.getOwnerID().equals(p.getUniqueId().toString())) {
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + getMessage("messages.not_your_key")));
             return;
         }
 
-        if (key.getAmountOfConnections() > 5 - 1) {
-            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "The key has reached its connection limit."));
+        if (!lock.getOwnerId().equals(p.getUniqueId().toString())) {
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + getMessage("messages.not_your_block")));
+            return;
+        }
+
+        if (key.getAmountOfConnections() > SimpleLocks.getPlugin().getConfig().getInt("max_connections_per_key") - 1) {
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + getMessage("messages.key_limit")));
             return;
         }
 
         if (lock.getKeyId() != null && key.hasConnection(lock.getKeyId())) {
-            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.YELLOW + "Already connected."));
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.YELLOW + getMessage("messages.already_connected")));
             return;
         }
 
@@ -135,7 +177,7 @@ public class KeyListener implements Listener {
             restOfKeys.setAmount(restOfKeys.getAmount() -1);
 
             key.getItem().setAmount(1);
-            key.connectToLock(lock);
+            key.connectToLock(lock, p);
 
             boolean hasFree = false;
             for (int i = 0; i < 36; i++){
@@ -151,10 +193,10 @@ public class KeyListener implements Listener {
             }
 
         } else {
-            key.connectToLock(lock);
+            key.connectToLock(lock, p);
         }
         lock.setLocked(true, p);
-        p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GREEN + "Key has been connected."));
+        p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GREEN + getMessage("messages.key_connected")));
     }
 
     @EventHandler
@@ -180,8 +222,11 @@ public class KeyListener implements Listener {
         boolean hasKey = hasKeyFor(lock, p);
 
         if (!hasKey) {
-            e.setCancelled(true);
-            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "You don't have a key."));
+            if (lock.isLocked()) {
+                e.setCancelled(true);
+                p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + getMessage("messages.no_key")));
+                return;
+            }
             return;
         }
 
@@ -194,12 +239,24 @@ public class KeyListener implements Listener {
 
                     if (isCurrentlyPoweredAdjacent(b) || isCurrentlyPoweredAdjacent(b.getRelative(BlockFace.UP))) {
                         p.swingMainHand();
-                        BlockState bs = b.getState();
                         door.setPowered(true);
                         door.setOpen(true);
-                        bs.setBlockData(door);
-                        bs.update();
+                        b.setBlockData(door);
                         if (b.getType().name().contains("IRON")) p.getWorld().playSound(b.getLocation(), Sound.BLOCK_IRON_DOOR_OPEN,1,1);
+                    }
+                }
+
+                if (b.getBlockData() instanceof TrapDoor door) {
+                    if (door.isOpen()) {
+                        e.setCancelled(true);
+                    }
+
+                    if (isCurrentlyPoweredAdjacent(b)) {
+                        p.swingMainHand();
+                        door.setPowered(true);
+                        door.setOpen(true);
+                        b.setBlockData(door);
+                        if (b.getType().name().contains("IRON")) p.getWorld().playSound(b.getLocation(), Sound.BLOCK_IRON_TRAPDOOR_OPEN,1,1);
                     }
                 }
 
@@ -209,33 +266,36 @@ public class KeyListener implements Listener {
                     quickOpen.put(p.getUniqueId(), lock);
                 }
             } else {
-                if (b.getBlockData() instanceof Door door) {
-                    lock.setLocked(true, p);
+                if (lock.getType().equals("container")) return;
 
-                    e.setCancelled(true);
+                lock.setLocked(true, p);
+                e.setCancelled(true);
+                if (b.getBlockData() instanceof Door door) {
+
+                    if (door.isOpen()) e.setCancelled(false);
+
+                    if (!b.getType().name().contains("IRON")) return;
                     if (door.isOpen()) {
-                        BlockState bs = b.getState();
+                        p.swingMainHand();
                         door.setPowered(false);
                         door.setOpen(false);
-                        bs.setBlockData(door);
-                        bs.update();
+                        b.setBlockData(door);
                         if (b.getType().name().contains("IRON")) p.getWorld().playSound(b.getLocation(), Sound.BLOCK_IRON_DOOR_CLOSE,1,1);
                     }
 
                 }
                 if (b.getBlockData() instanceof TrapDoor door) {
-                    lock.setLocked(true, p);
 
-                    e.setCancelled(true);
+                    if (door.isOpen()) e.setCancelled(false);
+
+                    if (!b.getType().name().contains("IRON")) return;
                     if (door.isOpen()) {
-                        BlockState bs = b.getState();
+                        p.swingMainHand();
                         door.setPowered(false);
                         door.setOpen(false);
-                        bs.setBlockData(door);
-                        bs.update();
-                        if (b.getType().name().contains("IRON")) p.getWorld().playSound(b.getLocation(), Sound.BLOCK_IRON_DOOR_CLOSE,1,1);
+                        b.setBlockData(door);
+                        if (b.getType().name().contains("IRON")) p.getWorld().playSound(b.getLocation(), Sound.BLOCK_IRON_TRAPDOOR_CLOSE,1,1);
                     }
-
                 }
             }
         } else {
@@ -244,6 +304,16 @@ public class KeyListener implements Listener {
 
             e.setCancelled(true);
             lock.setLocked(!lock.isLocked(), p);
+
+            if (lock.isLocked() && lock.getType().equals("container")) {
+                Inventory inventory = ((Container) b.getState()).getInventory();
+                List<HumanEntity> viewers = new ArrayList<>(inventory.getViewers());
+                for (HumanEntity viewer : viewers) {
+                    if (viewer instanceof Player player) {
+                        player.closeInventory();
+                    }
+                }
+            }
         }
     }
 
@@ -281,6 +351,21 @@ public class KeyListener implements Listener {
         for (int i = 0; i < 41; i++) {
             ItemStack item = inv.getItem(i);
             if (item == null) continue;
+
+            if (item.getType().toString().contains("BUNDLE")) {
+                if (item.hasItemMeta() && item.getItemMeta() instanceof BundleMeta bundleMeta) {
+                    // Scan all items inside the bundle
+                    for (ItemStack bundleItem : bundleMeta.getItems()) {
+                        if (bundleItem == null) continue;
+                        Key bundleKey = getKey(bundleItem);
+                        if (bundleKey != null && bundleKey.hasConnection(lock.getKeyId())) {
+                            return true; // Found a valid key in the bundle
+                        }
+                    }
+                }
+                continue;
+            }
+
             Key key = getKey(item);
             if (key == null) continue;
             if (!key.hasConnection(lock.getKeyId())) continue;
@@ -288,5 +373,4 @@ public class KeyListener implements Listener {
         }
         return false;
     }
-
 }

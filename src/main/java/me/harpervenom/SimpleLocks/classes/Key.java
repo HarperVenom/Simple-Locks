@@ -2,6 +2,7 @@ package me.harpervenom.SimpleLocks.classes;
 
 import me.harpervenom.SimpleLocks.SimpleLocks;
 import org.bukkit.*;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataContainer;
@@ -12,12 +13,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
+import static me.harpervenom.SimpleLocks.SimpleLocks.getMessage;
+import static me.harpervenom.SimpleLocks.SimpleLocks.getPlugin;
+import static me.harpervenom.SimpleLocks.classes.Lock.getLock;
 import static me.harpervenom.SimpleLocks.classes.Lock.getNeighbour;
 
 public class Key{
 
     private static final String INTEGER_KEY_PREFIX = "lockId_";
 
+    private String ownerID;
     private final ItemStack keyItem;
     private List<Integer> lockIds;
 
@@ -26,10 +31,13 @@ public class Key{
 
         ItemMeta meta = blankKey.getItemMeta();
         meta.getPersistentDataContainer().set(new NamespacedKey(SimpleLocks.getPlugin(),"key"), PersistentDataType.BOOLEAN,true);
-        meta.setDisplayName(ChatColor.GOLD + "Key");
+        meta.setDisplayName(ChatColor.GOLD + getMessage("names.key"));
+
+        int modelData = getPlugin().getConfig().getInt("custom_model_data");
+        meta.setCustomModelData(modelData);
 
         ArrayList<String> lore = new ArrayList<>();
-        lore.add(ChatColor.GRAY + "blank");
+        lore.add(ChatColor.GRAY + getMessage("names.blank"));
         meta.setLore(lore);
         blankKey.setItemMeta(meta);
 
@@ -41,10 +49,16 @@ public class Key{
         keyItem = item;
         lockIds = new ArrayList<>();  // Initialize empty list
 
+        checkModelData();
+
         // Extract the stored integers from the ItemStack's PersistentDataContainer
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             PersistentDataContainer container = meta.getPersistentDataContainer();
+
+            if (container.has(new NamespacedKey(SimpleLocks.getPlugin(),"owner"), PersistentDataType.STRING)) {
+                ownerID = container.get(new NamespacedKey(SimpleLocks.getPlugin(),"owner"), PersistentDataType.STRING);
+            }
 
             // Iterate over all possible stored integers and add them to the list
             int index = 0;
@@ -66,14 +80,29 @@ public class Key{
         return new Key(item);
     }
 
+    public void setOwnerID(String id) {
+        ItemMeta meta = keyItem.getItemMeta();
+        meta.getPersistentDataContainer().set(new NamespacedKey(SimpleLocks.getPlugin(),"owner"), PersistentDataType.STRING,id);
+        keyItem.setItemMeta(meta);
+
+        ownerID = id;
+    }
+    public String getOwnerID() {
+        return ownerID;
+    }
+
     public ItemStack getItem() {
         return keyItem;
     }
 
-    public void connectToLock(Lock lock) {
+    public void connectToLock(Lock lock, Player p) {
         Integer lockId = lock.getKeyId();
         if (lockId == null) return;
         lock.setConnected(true);
+
+        if (getAmountOfConnections() == 0) {
+            setOwnerID(p.getUniqueId().toString());
+        }
 
         addVisualKey();
         addConnection(lockId);
@@ -86,8 +115,6 @@ public class Key{
     }
 
     public void addConnection(int id) {
-        lockIds.add(id);
-
         ItemMeta meta = keyItem.getItemMeta();
         if (meta != null) {
             PersistentDataContainer container = meta.getPersistentDataContainer();
@@ -98,6 +125,8 @@ public class Key{
 
             keyItem.setItemMeta(meta);
         }
+
+        lockIds.add(id);
     }
 
     public void addVisualKey() {
@@ -119,21 +148,8 @@ public class Key{
     }
 
     public int getAmountOfConnections() {
-        ItemMeta meta = keyItem.getItemMeta();
-        if (meta != null) {
-            PersistentDataContainer container = meta.getPersistentDataContainer();
-
-            // Count the stored integers by checking the keys sequentially
-            int count = 0;
-            while (container.has(new NamespacedKey(SimpleLocks.getPlugin(), INTEGER_KEY_PREFIX + count), PersistentDataType.INTEGER)) {
-                count++;
-            }
-            return count;
-        }
-        return 0;
+        return lockIds.size();
     }
-
-
 
     public String generateName(){
         String CHARACTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -147,5 +163,16 @@ public class Key{
             stringBuilder.append(randomChar);
         }
         return stringBuilder.toString();
+    }
+
+    public void checkModelData() {
+        if (keyItem != null && keyItem.hasItemMeta() && keyItem.getItemMeta().hasCustomModelData()) {
+            int modelData = getPlugin().getConfig().getInt("custom_model_data");
+            ItemMeta meta = keyItem.getItemMeta();
+            if (meta.getCustomModelData() != modelData) {
+                meta.setCustomModelData(modelData);
+                keyItem.setItemMeta(meta);
+            }
+        }
     }
 }

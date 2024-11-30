@@ -35,14 +35,25 @@ public class Materials {
     public static int getMaxBlockHealth(Block b) {
         Material type = b.getType();
 
-        if (type.name().contains("IRON")) return 10;
-        if (type.name().contains("COPPER")) return 3;
-        if (type.name().contains("DOOR")) return 3;
+        if (type.name().contains("IRON")) return SimpleLocks.getPlugin().getConfig().getInt("iron_door_health");
+        if (type.name().contains("COPPER")) return SimpleLocks.getPlugin().getConfig().getInt("copper_door_health");
+        if (type.name().contains("DOOR")) return SimpleLocks.getPlugin().getConfig().getInt("wooden_door_health");
 
-        return 5;
+        return SimpleLocks.getPlugin().getConfig().getInt("chest_health");
     }
 
-    public static int getToolDamage(Block b, ItemStack tool) {
-        return 384;
+    public static int getToolDamage() {
+        return SimpleLocks.getPlugin().getConfig().getInt("tool_damage");
+    }
+
+    public static int getToolAttackDamage(ItemStack tool) {
+        Material type = tool.getType();
+        if (type.name().contains("WOODEN")) return SimpleLocks.getPlugin().getConfig().getInt("wooden_attack_damage");
+        if (type.name().contains("STONE")) return SimpleLocks.getPlugin().getConfig().getInt("stone_attack_damage");
+        if (type.name().contains("GOLDEN")) return SimpleLocks.getPlugin().getConfig().getInt("golden_attack_damage");
+        if (type.name().contains("IRON")) return SimpleLocks.getPlugin().getConfig().getInt("iron_attack_damage");
+        if (type.name().contains("DIAMOND")) return SimpleLocks.getPlugin().getConfig().getInt("diamond_attack_damage");
+        if (type.name().contains("NETHERITE")) return SimpleLocks.getPlugin().getConfig().getInt("netherite_attack_damage");
+        return 0;
     }
 }

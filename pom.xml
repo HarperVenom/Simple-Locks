@@ -6,7 +6,7 @@
 
   <groupId>me.harpervenom</groupId>
   <artifactId>SimpleLocks</artifactId>
-  <version>2.0</version>
+  <version>2.1.0</version>
   <packaging>jar</packaging>
 
   <name>SimpleLocks</name>
@@ -45,7 +45,7 @@
             <artifactId>maven-jar-plugin</artifactId>
             <version>3.3.0</version>
             <configuration>
-                <outputDirectory>C:\Users\Harper\Desktop\Server 1.21\plugins</outputDirectory>
+                <outputDirectory>C:\Users\Harper\Desktop\Server 1.21.3\plugins</outputDirectory>
             </configuration>
         </plugin>
     </plugins>
@@ -72,7 +72,7 @@
       <dependency>
           <groupId>org.spigotmc</groupId>
           <artifactId>spigot-api</artifactId>
-          <version>1.21-R0.1-SNAPSHOT</version>
+          <version>1.21.3-R0.1-SNAPSHOT</version>
           <scope>provided</scope>
       </dependency>
   </dependencies>

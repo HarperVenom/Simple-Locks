@@ -1,4 +1,5 @@
 name: SimpleLocks
-version: '2.0.0'
+version: '2.1.0'
 main: me.harpervenom.SimpleLocks.SimpleLocks
-api-version: '1.21'
+api-version: '1.21.3'
+author: Venom_Harper

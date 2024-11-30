@@ -1,0 +1,39 @@
+# Available en_US, ru_RU. To add a new language, create a yml file and copy the contents
+# from existing language file to the new one, replacing all the values in "" with translations
+language: "en_US"
+
+# Custom model data for keys:
+custom_model_data: 1
+
+# Maximum health values for different kinds of locks:
+
+# Doors and Trapdoors
+iron_door_health: 10
+copper_door_health: 3
+wooden_door_health: 3
+
+# Chests and Barrels:
+chest_health: 5
+
+
+# How many durability points are taken from the tool with each hit on the lock:
+tool_damage: 384
+
+# How many points are taken from a lock with each hit depending on the type of tool:
+wooden_attack_damage: 0
+stone_attack_damage: 0
+golden_attack_damage: 0
+iron_attack_damage: 0
+diamond_attack_damage: 1
+netherite_attack_damage: 1
+
+
+# Defines how many different locks can be connected to a single key:
+max_connections_per_key: 5
+
+
+# Defines whether zombies can break doors (only doors placed by players)
+zombie_break_doors: false
+
+# Defines whether doors can be exploded (only doors placed by players)
+doors_explode: false

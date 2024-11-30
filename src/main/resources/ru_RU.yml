@@ -1,0 +1,29 @@
+names:
+  key: "Ключ"
+  blank: "чистый"
+
+messages:
+  plugin_started: "Плагин запущен."
+
+  chunk_not_loaded: "Чанк не прогружен."
+
+  locked: "Заблокировано."
+  unlocked: "Разблокировано."
+
+  not_your_key: "Ключ вам не принадлежит."
+  not_your_block: "Блок вам не принадлежит."
+  key_limit: "Ключ достиг лимита привязок."
+  already_connected: "Уже привязано."
+  key_connected: "Ключ успешно привязан."
+  no_key: "У вас нет ключа."
+
+  block_next_to_another: "Вы не можете ставить блоки рядом с чужими."
+  block_connected: "Блок успешно подключен к соседнему."
+  cant_break_under_doors: "Вы не можете ломать блоки под дверьми."
+
+info:
+  no_owner: "Нет владельца."
+  owner: "Владелец"
+  connected: "Привязано"
+  locked: "Заблокировано"
+  health: "Прочность"

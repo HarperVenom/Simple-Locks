@@ -8,11 +8,15 @@ import org.bukkit.block.*;
 import org.bukkit.block.data.Bisected;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.type.Door;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Villager;
+import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.*;
+import org.bukkit.event.entity.EntityBreakDoorEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityInteractEvent;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
@@ -22,7 +26,6 @@ import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.material.Redstone;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -33,6 +36,7 @@ import java.util.UUID;
 
 import static me.harpervenom.SimpleLocks.ChunksListener.chunkNotLoaded;
 import static me.harpervenom.SimpleLocks.Materials.*;
+import static me.harpervenom.SimpleLocks.SimpleLocks.getMessage;
 import static me.harpervenom.SimpleLocks.classes.Lock.getLock;
 import static me.harpervenom.SimpleLocks.classes.Lock.getNeighbour;
 
@@ -56,8 +60,9 @@ public class LockListener implements Listener {
         Bukkit.getScheduler().runTaskLater(SimpleLocks.getPlugin(), () -> {
             Lock nextLock = getNeighbour(b.getLocation());
             if (nextLock != null && !nextLock.getOwnerId().equals(p.getUniqueId().toString())) {
-                e.setCancelled(true);
-                p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "You can't place the block next to someone else's"));
+                b.breakNaturally();
+                p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + getMessage("messages.block_next_to_another")));
+                return;
             }
 
             Lock lock = new Lock(p, b);
@@ -66,7 +71,7 @@ public class LockListener implements Listener {
                 lock.setConnected(true);
                 lock.setLocked(nextLock.isLocked());
                 lock.setKeyId(nextLock.getKeyId());
-                p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GREEN + "Block has been connected to the next one."));
+                p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GREEN + getMessage("messages.block_connected")));
             }
         }, 1);
     }
@@ -109,7 +114,7 @@ public class LockListener implements Listener {
 
         if (isUnderDoorBlock(b)){
             e.setCancelled(true);
-            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "You can't break blocks under doors."));
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + getMessage("messages.cant_break_under_doors")));
         }
     }
 
@@ -126,6 +131,7 @@ public class LockListener implements Listener {
 
     @EventHandler
     public void onExplosion(EntityExplodeEvent e) {
+        if (!SimpleLocks.getPlugin().getConfig().getBoolean("doors_explode")) return;
         List<Block> blocksToRemove = new ArrayList<>();
 
         for (Block block : e.blockList()) {
@@ -137,6 +143,18 @@ public class LockListener implements Listener {
         }
 
         e.blockList().removeAll(blocksToRemove);
+    }
+
+    @EventHandler
+    public void onZombieBreakDoor(EntityBreakDoorEvent e) {
+        if (!SimpleLocks.getPlugin().getConfig().getBoolean("zombie_break_doors")) return;
+        Entity entity = e.getEntity();
+        if (entity instanceof Zombie) {
+            Block b = e.getBlock();
+            Lock lock = getLock(b);
+            if (lock == null) return;
+            e.setCancelled(true);
+        }
     }
 
     @EventHandler
@@ -152,6 +170,8 @@ public class LockListener implements Listener {
         if (!p.isSneaking()) return;
         if (!getLockBlocks().contains(b.getType())) return;
         e.setCancelled(true);
+
+        if (!p.isOp()) return;
 
         showInfo(b, p);
     }
@@ -182,13 +202,18 @@ public class LockListener implements Listener {
             return false;
         }
 
-        int toolDamage = getToolDamage(b, tool);
+        boolean dealDamage = true;
+
+        int toolDamage = getToolDamage();
         ItemMeta meta = tool.getItemMeta();
         if (meta instanceof Damageable damageable){
 
-            if (tool.getType().getMaxDurability()-damageable.getDamage() <= toolDamage){
+            if (tool.getType().getMaxDurability() - damageable.getDamage() <= toolDamage){
                 p.getInventory().removeItem(tool);
                 p.getWorld().playSound(p,Sound.ENTITY_ITEM_BREAK,1,1);
+                if (tool.getType().getMaxDurability() - damageable.getDamage() < toolDamage) {
+                    dealDamage = false;
+                }
             } else {
                 damageable.setDamage(toolDamage + damageable.getDamage());
                 tool.setItemMeta(meta);
@@ -201,24 +226,30 @@ public class LockListener implements Listener {
 
         int blockMaxHealth = getMaxBlockHealth(b);
 
+        int attackDamage = getToolAttackDamage(tool);
+
         if (!damagedBlocks.containsKey(b)) {
-            damagedBlocks.put(b, blockMaxHealth -1);
-            b.getWorld().playSound(b.getLocation(), breakingSound, 0.7f, 1.5f);
-            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "" + (blockMaxHealth-1) + "/" + blockMaxHealth));
-            scheduleRestoreHealth(b);
+            damagedBlocks.put(b, dealDamage ? (blockMaxHealth - attackDamage) : blockMaxHealth);
         } else {
-            damagedBlocks.put(b, damagedBlocks.getOrDefault(b, 0) - 1);
+            if (dealDamage) damagedBlocks.put(b, damagedBlocks.getOrDefault(b, 0) - attackDamage);
 
             if (damagedBlocks.get(b) == 0) {
                 damagedBlocks.remove(b);
+
+                if (b.getType().name().contains("IRON") || b.getType().name().contains("COPPER")) {
+                    b.getWorld().playSound(b.getLocation(), Sound.ENTITY_ZOMBIE_ATTACK_IRON_DOOR,1,1);
+                } else {
+                    b.getWorld().playSound(b.getLocation(), Sound.ENTITY_ZOMBIE_BREAK_WOODEN_DOOR,1,1);
+                }
+
                 p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(""));
                 return true;
             }
 
-            b.getWorld().playSound(b.getLocation(), breakingSound, 0.7f, 1.5f);
-            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "" + damagedBlocks.get(b) + "/" + blockMaxHealth));
-            scheduleRestoreHealth(b);
         }
+        b.getWorld().playSound(b.getLocation(), breakingSound, 0.7f, 1.5f);
+        p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.RED + "" + damagedBlocks.get(b) + "/" + blockMaxHealth));
+        scheduleRestoreHealth(b);
 
         return false;
     }
@@ -250,7 +281,7 @@ public class LockListener implements Listener {
         Lock lock = getLock(b);
 
         if (lock == null) {
-            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GRAY + "No owner."));
+            p.spigot().sendMessage(ChatMessageType.ACTION_BAR, new TextComponent(ChatColor.GRAY + getMessage("info.no_owner")));
             return;
         }
 
@@ -261,10 +292,10 @@ public class LockListener implements Listener {
         }
         p.sendMessage(ChatColor.YELLOW + "-----------------");
         p.sendMessage(ChatColor.YELLOW + "ID: " + lock.getId());
-        p.sendMessage(ChatColor.YELLOW + "Owner: " + Bukkit.getOfflinePlayer(UUID.fromString(lock.getOwnerId())).getName());
-        p.sendMessage(ChatColor.YELLOW + "Connected: " + lock.isConnected());
-        p.sendMessage(ChatColor.YELLOW + "Locked: " + lock.isLocked());
-        p.sendMessage(ChatColor.YELLOW + "Health: " + health + "/" + maxBlockHealth);
+        p.sendMessage(ChatColor.YELLOW + getMessage("info.owner") + ": " + Bukkit.getOfflinePlayer(UUID.fromString(lock.getOwnerId())).getName());
+        p.sendMessage(ChatColor.YELLOW + getMessage("info.connected") + ": " + lock.isConnected());
+        p.sendMessage(ChatColor.YELLOW + getMessage("info.locked") + ": " + lock.isLocked());
+        p.sendMessage(ChatColor.YELLOW + getMessage("info.health") + ": " + health + "/" + maxBlockHealth);
     }
 
     public static Block getMainBlock(Block b) {

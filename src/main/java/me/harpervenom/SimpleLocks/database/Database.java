@@ -44,10 +44,6 @@ public class Database {
         }
     }
 
-    public CompletableFuture<Integer> createLock(String ownerId, int x, int y, int z, String world, String type) {
-        return createLock(ownerId, x, y, z, world, type, false, false);
-    }
-
     public CompletableFuture<Integer> createLock(String ownerId, int x, int y, int z, String world, String type, boolean isConnected, boolean isLocked) {
         return CompletableFuture.supplyAsync(() -> {
             String insertSql = "INSERT INTO locks (owner_id, x, y, z, world, type, connected, locked) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
